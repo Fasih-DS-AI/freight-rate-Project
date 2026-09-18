@@ -59,7 +59,7 @@ def money(x): return f"${x:,.0f}"
 
 
 # ----------------------------------------------------------------------------- content model
-def build_content(n: dict, candidate: str, repo_url: str) -> list:
+def build_content(n: dict, candidate: str, repo_url: str, loom_url: str = "") -> list:
     h = n["holdout"]; hy = h.loc["hybrid (this submission)"]; bt = n["backtest"]; ms = n["model"]; ex = n["extra"]
     base_bin = h.loc["equipment x distance-bin median rate/mile"]; base_quote = h.loc["quote_signal x distance (the tempting leak)"]; base_med = h.loc["median rate/mile x distance"]
     pure = next(r for r in ex["backtest_summary"] if r["model"].startswith("single")); hyb = next(r for r in ex["backtest_summary"] if r["model"] == "hybrid")
@@ -71,7 +71,7 @@ def build_content(n: dict, candidate: str, repo_url: str) -> list:
     # ---- title
     A(("title", "Freight Rate Prediction"))
     A(("subtitle", "Machine Learning Engineer assessment, Spotter"))
-    A(("meta", f"{candidate}  |  {date.today().strftime('%d %B %Y')}  |  {repo_url}"))
+    A(("meta", f"{candidate}  |  {date.today().strftime('%d %B %Y')}  |  Code: {repo_url}" + (f"  |  Walkthrough: {loom_url}" if loom_url else "")))
 
     # ---- 1 summary
     A(("h1", "1. Summary"))
@@ -304,9 +304,9 @@ def html_to_pdf(html_path: Path, pdf_path: Path) -> bool:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(); ap.add_argument("--candidate", default="Jahan"); ap.add_argument("--repo-url", default="github.com (link in README)")
+    ap = argparse.ArgumentParser(); ap.add_argument("--candidate", default="Fasih Ur Rehman"); ap.add_argument("--repo-url", default="github.com (link in README)"); ap.add_argument("--loom-url", default="")
     ap.add_argument("--name", default="Freight_Rate_Report"); args = ap.parse_args()
-    n = load_numbers(); content = build_content(n, args.candidate, args.repo_url)
+    n = load_numbers(); content = build_content(n, args.candidate, args.repo_url, args.loom_url)
     docx_path = config.REPORT_DIR / f"{args.name}.docx"; html_path = config.REPORT_DIR / f"{args.name}.html"; pdf_path = config.REPORT_DIR / f"{args.name}.pdf"
     render_docx(content, docx_path); render_html(content, html_path); ok = html_to_pdf(html_path, pdf_path)
     print(f"wrote {docx_path}\nwrote {html_path}\n" + (f"wrote {pdf_path}" if ok else "PDF not written"))

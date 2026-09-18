@@ -12,7 +12,7 @@ scorer is untouched (`score.py`); everything else lives in `src/freight_rate/`.
 | Predictions | [`validation_predictions.csv`](validation_predictions.csv) (repo root; copy in `outputs/`) |
 | Report (validation approach, data split, December chart) | [`reports/Freight_Rate_Report.pdf`](reports/Freight_Rate_Report.pdf) (also `.docx`) |
 | December chart from `score.py` | [`scorer_results/candidate_december.png`](scorer_results/candidate_december.png) |
-| Walkthrough video | _Loom link to be added_ |
+| Walkthrough video (Loom, ~3 min) | https://www.loom.com/share/aef38079b00342b2af36746f4e08f382 |
 
 ## Quick start
 
