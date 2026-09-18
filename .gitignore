@@ -7,3 +7,5 @@ outputs/models/
 .venv/
 venv/
 data/original/
+submission/
+reports/*.html

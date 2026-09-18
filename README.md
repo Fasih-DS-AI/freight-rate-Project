@@ -5,6 +5,15 @@ market index, for the 12,000 loads in `data/validation.csv` (Nov-Dec 2025) after
 from the 48,000 labelled loads in `data/train_test.csv` (Jan-Oct 2025). The provided
 scorer is untouched (`score.py`); everything else lives in `src/freight_rate/`.
 
+## Deliverables
+
+| item | where |
+|---|---|
+| Predictions | [`validation_predictions.csv`](validation_predictions.csv) (repo root; copy in `outputs/`) |
+| Report (validation approach, data split, December chart) | [`reports/Freight_Rate_Report.pdf`](reports/Freight_Rate_Report.pdf) (also `.docx`) |
+| December chart from `score.py` | [`scorer_results/candidate_december.png`](scorer_results/candidate_december.png) |
+| Walkthrough video | _Loom link to be added_ |
+
 ## Quick start
 
 ```bash

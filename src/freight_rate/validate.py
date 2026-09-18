@@ -89,12 +89,11 @@ def run_holdout(train_all: pd.DataFrame, builder: FeatureBuilder, make_model: Mo
     comparison = pd.DataFrame(rows)
 
     inl = test[inlier]
-    by_month = inl.groupby(inl[config.DATE_COLUMN].dt.to_period("M")).apply(
-        lambda g: pd.Series(regression_metrics(g[config.TARGET], g["predicted_rate"]))).reset_index()
-    by_equipment = inl.groupby("equipment").apply(
-        lambda g: pd.Series(regression_metrics(g[config.TARGET], g["predicted_rate"]))).reset_index()
-    by_distance = inl.groupby(pd.cut(inl["distance"], [0, 300, 600, 1000, 1500, 2500, 4000]), observed=True).apply(
-        lambda g: pd.Series(regression_metrics(g[config.TARGET], g["predicted_rate"]))).reset_index()
+    cols = [config.TARGET, "predicted_rate"]
+    score = lambda g: pd.Series(regression_metrics(g[config.TARGET], g["predicted_rate"]))
+    by_month = inl.groupby(inl[config.DATE_COLUMN].dt.to_period("M"))[cols].apply(score).reset_index()
+    by_equipment = inl.groupby("equipment")[cols].apply(score).reset_index()
+    by_distance = inl.groupby(pd.cut(inl["distance"], [0, 300, 600, 1000, 1500, 2500, 4000]), observed=True)[cols].apply(score).reset_index()
     return {
         "train_range": (str(train[config.DATE_COLUMN].min().date()), str(train[config.DATE_COLUMN].max().date())),
         "test_range": (str(test[config.DATE_COLUMN].min().date()), str(test[config.DATE_COLUMN].max().date())),
@@ -124,6 +123,13 @@ def run_backtest(train_all: pd.DataFrame, builder: FeatureBuilder, make_model: M
 
 
 # ----------------------------------------------------------------------------- reporting
+def short_window(window: str) -> str:
+    """'2025-05-01 to 2025-07-01' -> 'May-Jun 2025'."""
+    start, end = window.split(" to ")
+    a = pd.Timestamp(start); b = pd.Timestamp(end) - pd.Timedelta(days=1)
+    return f"{a.strftime('%b')}-{b.strftime('%b')} {b.year}"
+
+
 def _fmt(df: pd.DataFrame, digits: int = 3) -> str:
     return df.to_markdown(index=False, floatfmt=f".{digits}f") if hasattr(df, "to_markdown") else df.to_string(index=False)
 
@@ -153,13 +159,22 @@ def write_validation_report(holdout: dict, backtest: pd.DataFrame, report_dir: P
     ax.set_title("Holdout: daily mean rate per mile, actual vs predicted"); ax.legend(); ax.grid(alpha=0.3)
     fig.tight_layout(); fig.savefig(figures / "holdout_daily_rpm.png"); plt.close(fig)
 
-    # figure 3: backtest
-    fig, ax = plt.subplots(figsize=(8, 4), dpi=150)
-    ax.bar(backtest["test_window"], backtest["inlier_MAPE"] * 100, color="#064A56")
-    for i, (m, b) in enumerate(zip(backtest["inlier_MAPE"], backtest["bias_pct"])):
-        ax.text(i, m * 100 + 0.05, f"{m*100:.2f}%\nbias {b:+.1f}%", ha="center", fontsize=8)
-    ax.set_ylabel("MAPE on genuine loads (%)"); ax.set_title("Rolling-origin backtest (2-month horizon, train on everything before)")
-    ax.tick_params(axis="x", rotation=20); fig.tight_layout(); fig.savefig(figures / "backtest_mape.png"); plt.close(fig)
+    # figure 3: backtest (only when it was run)
+    has_backtest = len(backtest) > 0
+    if has_backtest:
+        fig, ax = plt.subplots(figsize=(8, 4), dpi=150)
+        labels = [short_window(w) for w in backtest["test_window"]]
+        ax.bar(labels, backtest["inlier_MAPE"] * 100, color="#064A56")
+        for i, (m, b) in enumerate(zip(backtest["inlier_MAPE"], backtest["inlier_bias_pct"])):
+            ax.text(i, m * 100 + 0.04, f"{m*100:.2f}%\nbias {b:+.2f}%", ha="center", fontsize=8)
+        ax.set_ylim(0, backtest["inlier_MAPE"].max() * 100 * 1.35)
+        ax.set_ylabel("MAPE on genuine loads (%)"); ax.set_xlabel("test window (trained on everything before it)")
+        ax.set_title("Rolling-origin backtest, two-month horizon", loc="left", fontweight="bold")
+        fig.tight_layout(); fig.savefig(figures / "backtest_mape.png"); plt.close(fig)
+    backtest_lines = (
+        ["## Rolling-origin backtest", "", _fmt(backtest[["test_window", "n_train", "n_test", "MAE", "MAPE", "inlier_MAE", "inlier_MAPE", "inlier_bias_pct", "trend_pct_per_month", "quarter_end_ramp_pct"]]), "",
+         f"Backtest mean: MAE {backtest['MAE'].mean():.1f}, inlier MAPE {backtest['inlier_MAPE'].mean()*100:.2f}%, mean |inlier bias| {backtest['inlier_bias_pct'].abs().mean():.2f}%", ""]
+        if has_backtest else ["## Rolling-origin backtest", "", "Skipped (`--skip-backtest`).", ""])
 
     # markdown summary
     s = holdout["model_summary"]
@@ -170,8 +185,7 @@ def write_validation_report(holdout: dict, backtest: pd.DataFrame, report_dir: P
         "## Holdout by month (genuine loads)", "", _fmt(holdout["by_month"]), "",
         "## Holdout by equipment (genuine loads)", "", _fmt(holdout["by_equipment"]), "",
         "## Holdout by distance band (genuine loads)", "", _fmt(holdout["by_distance"]), "",
-        "## Rolling-origin backtest", "", _fmt(backtest[["test_window", "n_train", "n_test", "MAE", "MAPE", "inlier_MAE", "inlier_MAPE", "inlier_bias_pct", "trend_pct_per_month", "quarter_end_ramp_pct"]]), "",
-        f"Backtest mean: MAE {backtest['MAE'].mean():.1f}, inlier MAPE {backtest['inlier_MAPE'].mean()*100:.2f}%, mean |inlier bias| {backtest['inlier_bias_pct'].abs().mean():.2f}%", "",
+        *backtest_lines,
         "## Fitted time component (holdout model)", "",
         f"- trend: {s['trend_pct_per_month']:+.2f}% per month (mode: {s['trend_mode']})",
         f"- market index elasticity: {s['market_index_elasticity_log_pts']:.3f} log-points per index unit",
