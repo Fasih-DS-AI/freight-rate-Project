@@ -1,4 +1,4 @@
-# Freight Rate Prediction (Spotter ML Engineer assessment)
+# Freight Rate Prediction  
 
 Predicts the `posted_rate` of truckload freight from lane, equipment, weight, date and a
 market index, for the 12,000 loads in `data/validation.csv` (Nov-Dec 2025) after learning
